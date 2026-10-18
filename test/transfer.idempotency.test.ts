@@ -85,7 +85,7 @@ describe("idempotency", () => {
 
     // TODO B: isi saldo pengirim 100 lagi: await topUp(sender.accountId, 100, sender.userId)
     //         (import topUp dari "../src/wallet/top-up")
-    await topUp(sender.accountId, 100, sender.userId);
+    await topUp(sender.accountId, 100, sender.userId, randomUUID());
 
     // TODO C: transfer 100 dengan key yang SAMA, harus berhasil
     //         dan hasilnya TIDAK replayed (expect(result.replayed).toBeUndefined())

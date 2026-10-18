@@ -8,6 +8,7 @@ import { isUniqueViolation } from "./db-errors";
 import { requireAuth, type AuthedRequest } from "./auth";
 import { transfer } from "./wallet/transfer";
 import { DomainError } from "./wallet/errors";
+import { topUp } from "./wallet/top-up";
 
 export const app = express();
 app.use(express.json());
@@ -30,6 +31,10 @@ const historyQuery = z.object({
 const transferBody = z.object({
   toAccountId: z.number().int().positive(),
   amount: z.number().int().positive(),
+});
+
+const topUpBody = z.object({
+  amount: z.number().int().positive().max(10_000_000),
 });
 
 app.get("/health", async (_req, res) => {
@@ -165,5 +170,44 @@ app.post("/transfer", requireAuth, async (req: AuthedRequest, res) => {
     }
     console.error(error);
     res.status(500).json({ error: "Terjadi kesalahan" });
+  }
+});
+
+app.post("/topup", requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = topUpBody.safeParse(req.body);
+  const key = req.header("Idempotency-Key");
+
+  if (!parsed.success || !key) {
+    return res.status(400).json({ error: "Parameter tidak valid" });
+  }
+
+  try {
+    const acc = await pool.query(
+      `SELECT id
+       FROM accounts
+       WHERE user_id = $1 AND type = 'user'
+       LIMIT 1`,
+      [req.userId],
+    );
+
+    if (acc.rows.length === 0) {
+      return res.status(404).json({ error: "Akun tidak ditemukan" });
+    }
+
+    const result = await topUp(
+      Number(acc.rows[0].id),
+      parsed.data.amount,
+      req.userId!,
+      key,
+    );
+
+    return res.status(201).json(result);
+  } catch (error: unknown) {
+    if (error instanceof DomainError) {
+      return res.status(422).json({ error: error.message });
+    }
+
+    console.error(error);
+    return res.status(500).json({ error: "Terjadi kesalahan" });
   }
 });
