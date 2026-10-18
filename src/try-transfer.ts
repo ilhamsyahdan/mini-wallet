@@ -21,7 +21,6 @@ async function main() {
     randomUUID(),
     sender.user_id,
   );
-  console.log("hasil: ", result);
 
   await pool.end();
 }

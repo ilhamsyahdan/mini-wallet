@@ -5,9 +5,8 @@ import { describe } from "vitest";
 import { it } from "vitest";
 import { app } from "../src/app";
 import { expect } from "vitest";
-import { resetDb } from "./helpers";
+import { registerAndLogin, resetDb } from "./helpers";
 import { beforeEach } from "vitest";
-import { topUp } from "../src/wallet/top-up";
 
 beforeEach(async () => {
   await resetDb();
@@ -16,14 +15,6 @@ beforeEach(async () => {
 afterAll(async () => {
   await pool.end();
 });
-
-async function registerAndLogin(email: string) {
-  await request(app).post("/register").send({ email, password: "rahasia123" });
-  const login = await request(app)
-    .post("/login")
-    .send({ email, password: "rahasia123" });
-  return login.body.token as string;
-}
 
 async function getIds(email: string) {
   const r = await pool.query(
@@ -102,7 +93,11 @@ describe("transfer", () => {
     const a = await getIds("a@x.com");
     const b = await getIds("b@x.com");
 
-    await topUp(a.accountId, 1000, a.userId);
+    await request(app)
+      .post("/topup")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .set("Idempotency-Key", "setup-topup")
+      .send({ amount: 1000 });
 
     const first = await request(app)
       .post("/transfer")
@@ -149,7 +144,11 @@ describe("transfer", () => {
     const a = await getIds("a@x.com");
     const b = await getIds("b@x.com");
 
-    await topUp(a.accountId, 1000, a.userId);
+    await request(app)
+      .post("/topup")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .set("Idempotency-Key", "setup-topup")
+      .send({ amount: 1000 });
 
     const first = await request(app)
       .post("/transfer")
