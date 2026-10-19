@@ -11,7 +11,7 @@ Ini proyek belajar, **bukan sistem pembayaran sungguhan**.
 - Top-up (simulasi) dan transfer antar akun
 - Ledger double-entry sebagai sumber kebenaran saldo
 - Aman terhadap request bersamaan (concurrency) dan request ulang (idempotency)
-- HTTP API (Express) dengan register, login (JWT), riwayat, dan transfer
+- HTTP API (Express) dengan register, login (JWT), top-up, riwayat, dan transfer
 - Belum ada frontend
 
 ## Teknologi
@@ -82,13 +82,14 @@ ke banyak akun belum diuji. Angka bergantung pada mesin dan cache (semua `shared
 
 ## API
 
-| Endpoint                      | Auth   | Fungsi                                                         |
-| ----------------------------- | ------ | -------------------------------------------------------------- |
-| `GET /health`                 | tidak  | Cek server                                                     |
-| `POST /register`              | tidak  | Daftar (password di-hash argon2), otomatis membuat akun        |
-| `POST /login`                 | tidak  | Mengembalikan JWT (berlaku 1 jam)                              |
-| `GET /history?limit=&cursor=` | Bearer | Riwayat akun milik user, keyset pagination                     |
-| `POST /transfer`              | Bearer | Body `{ toAccountId, amount }`, header `Idempotency-Key` wajib |
+| Endpoint                      | Auth   | Fungsi                                                                                            |
+| ----------------------------- | ------ | ------------------------------------------------------------------------------------------------- |
+| `GET /health`                 | tidak  | Cek server                                                                                        |
+| `POST /register`              | tidak  | Daftar (password di-hash argon2), otomatis membuat akun                                           |
+| `POST /login`                 | tidak  | Mengembalikan JWT (berlaku 1 jam)                                                                 |
+| `GET /history?limit=&cursor=` | Bearer | Riwayat akun milik user, keyset pagination                                                        |
+| `POST /transfer`              | Bearer | Body `{ toAccountId, amount }`, header `Idempotency-Key` wajib                                    |
+| `POST /topup`                 | Bearer | Body `{ amount }` (1..10.000.000), header `Idempotency-Key` wajib. Simulasi tanpa payment gateway |
 
 Prinsip keamanan: identitas (`userId`, akun pengirim) selalu diambil dari token,
 bukan dari input client, sehingga user tidak bisa membaca atau memakai akun orang lain (IDOR ditutup).
@@ -117,10 +118,11 @@ Isi `TEST_DATABASE_URL` di `.env` agar mengarah ke `wallet_test`.
 
 ## Batasan yang diketahui
 
-- Belum ada endpoint top-up; `topUp` baru berupa fungsi (teruji lewat skrip)
-- Error domain di `/transfer` dipetakan lewat pencocokan teks pesan (rapuh), belum kelas error
 - Celah timing kecil di login saat email tidak terdaftar
 - Token berlaku 1 jam, belum ada refresh token, rate limiting, atau audit log
 - Migration masih manual (belum ada migration runner)
 - Belum ada test deadlock dua arah
 - Satu user DB dengan hak penuh (belum least privilege)
+- Top-up langsung sukses tanpa pembayaran sungguhan. Akun sistem mewakili bank/payment gateway; di sistem nyata, ledger baru dicatat setelah konfirmasi (webhook) dari gateway
+- Semua user yang login boleh top-up (belum ada role admin)
+- Replay top-up mengembalikan saldo saat ini, bukan saldo saat request pertama
