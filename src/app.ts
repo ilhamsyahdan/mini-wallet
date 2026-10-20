@@ -9,6 +9,7 @@ import { requireAuth, type AuthedRequest } from "./auth";
 import { transfer } from "./wallet/transfer";
 import { DomainError } from "./wallet/errors";
 import { topUp } from "./wallet/top-up";
+import { authLimiter } from "./rate-limit";
 
 export const app = express();
 app.use(express.json());
@@ -37,11 +38,13 @@ const topUpBody = z.object({
   amount: z.number().int().positive().max(10_000_000),
 });
 
+const loginLimit = process.env.NODE_ENV === "test" ? 1000 : 5;
+
 app.get("/health", async (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.post("/register", async (req, res) => {
+app.post("/register", authLimiter(loginLimit), async (req, res) => {
   const parsed = registerBody.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Parameter tidak valid" });
@@ -82,7 +85,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-app.post("/login", async (req, res) => {
+app.post("/login", authLimiter(loginLimit), async (req, res) => {
   const parsed = loginBody.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Parameter tidak valid" });
